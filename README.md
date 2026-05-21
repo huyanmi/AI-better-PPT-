@@ -1,51 +1,64 @@
 # PPT Optimizer
 
-## 涓枃璇存槑
+## 中文说明
 
-杩欐槸涓€涓湰鍦拌繍琛岀殑 PPT 浼樺寲鍛戒护琛屽伐鍏凤紝鐢ㄤ簬鍒嗘瀽鍜屼紭鍖?`.pptx`
-鏂囦欢銆傚畠鐩存帴澶勭悊 PowerPoint 鐨?Open XML 鍖呯粨鏋勶紝涓嶄緷璧?PowerPoint
-鎴?`python-pptx`銆傚鏋滄湰鏈哄畨瑁呬簡 Pillow锛岃繕鍙互瀵?PPT 鍐呯殑澶у浘鐗囪繘琛屽帇缂┿€?
-### 鍔熻兘
+这是一个本地运行的 PPT 优化命令行工具，用于分析和优化 `.pptx`
+文件。它直接处理 PowerPoint 的 Open XML 包结构，不依赖 PowerPoint
+或 `python-pptx`。如果本机安装了 Pillow，还可以对 PPT 内的大图片进行压缩。
 
-- 鐢熸垚 PPT 鍒嗘瀽鎶ュ憡銆?- 缁熶竴鎸囧畾椤甸潰鎴栨暣浠?PPT 鐨勫瓧浣撱€?- 鍒犻櫎婕旇鑰呭娉ㄥ拰璇勮鐩稿叧淇℃伅銆?- 鍘嬬缉鎴栫缉鏀?PPT 鍐呰繃澶х殑鍥剧墖銆?- 杈撳嚭鏂扮殑浼樺寲鍓湰锛屼笉浼氳鐩栧師鏂囦欢銆?- 鏀寔鍙紭鍖栨寚瀹氶〉锛屼緥濡傜 3 椤垫垨绗?2銆?-7 椤点€?
-### 浣跨敤鏂规硶
+### 功能
 
-鍏堣繘鍏ラ」鐩洰褰曪細
+- 生成 PPT 分析报告。
+- 统一指定页面或整份 PPT 的字体。
+- 删除演讲者备注和评论相关信息。
+- 压缩或缩放 PPT 内过大的图片。
+- 输出新的优化副本，不会覆盖原文件。
+- 支持只优化指定页，例如第 3 页或第 2、5-7 页。
+
+### 使用方法
+
+先进入项目目录：
 
 ```powershell
 cd C:\Users\22625\Documents\Playground
 ```
 
-浼樺寲鏁翠唤 PPT锛?
+优化整份 PPT：
+
 ```powershell
 python -m ppt_optimizer input.pptx -o optimized.pptx --font "Microsoft YaHei"
 ```
 
-鍙垎鏋愶紝涓嶅鍑烘柊鏂囦欢锛?
+只分析，不导出新文件：
+
 ```powershell
 python -m ppt_optimizer input.pptx --report-only
 ```
 
-鍙紭鍖栨煇涓€椤碉細
+只优化某一页：
 
 ```powershell
 python -m ppt_optimizer input.pptx -o optimized.pptx --slides 3
 ```
 
-鍙紭鍖栧椤碉細
+只优化多页：
 
 ```powershell
 python -m ppt_optimizer input.pptx -o optimized.pptx --slides 2,5-7
 ```
 
-鍘嬬缉鍥剧墖锛?
+压缩图片：
+
 ```powershell
 python -m ppt_optimizer input.pptx -o optimized.pptx --image-quality 72 --max-image-width 1920
 ```
 
-### 璇存槑
+### 说明
 
-褰撳墠浼樺寲鍣ㄥ亸淇濆畧锛氬畠浼氬敖閲忎繚鐣欏師 PPT 鐨勫竷灞€銆佸姩鐢汇€佸浘琛ㄥ拰姣嶇増缁撴瀯锛屽彧淇敼瀛椾綋銆?澶囨敞銆佽瘎璁恒€佸浘鐗囧拰鐩稿叧 Open XML 鍖呯粨鏋勩€傞€傚悎鍏堝仛鍗曢〉瀹氬悜浼樺寲锛屽啀閫愭鎵╁睍鍒版洿澶嶆潅鐨?瑙嗚閲嶆帓鑳藉姏銆?
+当前优化器偏保守：它会尽量保留原 PPT 的布局、动画、图表和母版结构，只修改字体、
+备注、评论、图片和相关 Open XML 包结构。适合先做单页定向优化，再逐步扩展到更复杂的
+视觉重排能力。
+
 ## English
 
 A small local CLI for analyzing and optimizing `.pptx` files.
