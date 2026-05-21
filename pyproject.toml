@@ -1,0 +1,9 @@
+[project]
+name = "ppt-optimizer"
+version = "0.1.0"
+description = "Local CLI for analyzing and optimizing PowerPoint pptx files."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

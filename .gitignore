@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Generated presentation artifacts and local test decks.
+outputs/
+*.pptx
+*.ppt
+*.pdf
+
+# Local editor / OS files.
+.DS_Store
+Thumbs.db
