@@ -3,6 +3,9 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
+build/
+dist/
+*.spec
 
 # Generated presentation artifacts and local test decks.
 outputs/

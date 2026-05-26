@@ -53,6 +53,27 @@ python -m ppt_optimizer input.pptx -o optimized.pptx --slides 2,5-7
 python -m ppt_optimizer input.pptx -o optimized.pptx --image-quality 72 --max-image-width 1920
 ```
 
+### 图形界面 / EXE
+
+也可以使用桌面图形界面，适合“上传 PPT -> 处理 -> 下载优化版”的流程：
+
+```powershell
+python ppt_optimizer_gui.py
+```
+
+打包为 Windows exe：
+
+```powershell
+python -m pip install pyinstaller
+.\build_exe.ps1
+```
+
+打包完成后，程序位于：
+
+```text
+dist\PPTOptimizer.exe
+```
+
 ### 说明
 
 当前优化器偏保守：它会尽量保留原 PPT 的布局、动画、图表和母版结构，只修改字体、
@@ -98,6 +119,19 @@ Optimize only selected slides:
 ```powershell
 python -m ppt_optimizer input.pptx -o optimized.pptx --slides 3
 python -m ppt_optimizer input.pptx -o optimized.pptx --slides 2,5-7
+```
+
+Run the desktop UI:
+
+```powershell
+python ppt_optimizer_gui.py
+```
+
+Build a Windows executable:
+
+```powershell
+python -m pip install pyinstaller
+.\build_exe.ps1
 ```
 
 ## Notes
