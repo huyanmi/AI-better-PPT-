@@ -14,6 +14,8 @@
 - 压缩或缩放 PPT 内过大的图片。
 - 输出新的优化副本，不会覆盖原文件。
 - 支持只优化指定页，例如第 3 页或第 2、5-7 页。
+- 支持指定页“科研风重绘”：抽取原页文字后，重排为红蓝标题、架构图、
+  证据矩阵、结论条等科研汇报版式。
 
 ### 使用方法
 
@@ -39,6 +41,12 @@ python -m ppt_optimizer input.pptx --report-only
 
 ```powershell
 python -m ppt_optimizer input.pptx -o optimized.pptx --slides 3
+```
+
+把某一页重绘为科研汇报风：
+
+```powershell
+python -m ppt_optimizer input.pptx -o research-style.pptx --slides 3 --research-style
 ```
 
 只优化多页：
@@ -76,9 +84,12 @@ dist\PPTOptimizer.exe
 
 ### 说明
 
-当前优化器偏保守：它会尽量保留原 PPT 的布局、动画、图表和母版结构，只修改字体、
-备注、评论、图片和相关 Open XML 包结构。适合先做单页定向优化，再逐步扩展到更复杂的
-视觉重排能力。
+常规优化模式偏保守：它会尽量保留原 PPT 的布局、动画、图表和母版结构，只修改字体、
+备注、评论、图片和相关 Open XML 包结构。
+
+如果你想看到明显的科研风视觉变化，请使用 `--research-style --slides 页码`，或在 EXE
+里勾选“科研风重绘”。这个模式会重绘指定页，适合先对单页做精确优化，再逐步扩展到整份
+PPT。
 
 ## English
 
@@ -95,6 +106,8 @@ JPEG/PNG images.
 - Remove speaker notes and comment authors.
 - Recompress oversized images when Pillow is available.
 - Write a new optimized copy without changing the original file.
+- Redesign selected slides into a Chinese research-report style with title bars,
+  diagrams, evidence tables, and conclusion strips.
 
 ## Usage
 
@@ -121,6 +134,12 @@ python -m ppt_optimizer input.pptx -o optimized.pptx --slides 3
 python -m ppt_optimizer input.pptx -o optimized.pptx --slides 2,5-7
 ```
 
+Redesign one slide into the research-report style:
+
+```powershell
+python -m ppt_optimizer input.pptx -o research-style.pptx --slides 3 --research-style
+```
+
 Run the desktop UI:
 
 ```powershell
@@ -138,3 +157,6 @@ python -m pip install pyinstaller
 
 The optimizer is intentionally conservative. It keeps layout, animations, charts,
 and slide masters intact while changing only scoped XML/package parts.
+
+Use `--research-style` with `--slides` when you want a visible one-slide layout
+redesign instead of a conservative cleanup.

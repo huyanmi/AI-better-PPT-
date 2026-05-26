@@ -194,6 +194,33 @@ def test_targeted_slide_without_notes_does_not_remove_other_notes(tmp_path: Path
     assert "/ppt/notesSlides/notesSlide1.xml" in content_types
 
 
+def test_research_style_redesigns_only_selected_slide(tmp_path: Path) -> None:
+    source = tmp_path / "deck.pptx"
+    output = tmp_path / "deck.research.pptx"
+    make_two_slide_pptx(source)
+
+    report = optimize_pptx(
+        source,
+        output,
+        OptimizationOptions(remove_notes=True, slide_numbers=(2,), research_style=True),
+    )
+
+    assert report.slides == 2
+    assert report.target_slides == (2,)
+    assert report.text_runs == 1
+    assert report.font_runs_changed == 0
+    assert report.slides_redesigned == 1
+
+    with zipfile.ZipFile(output) as zf:
+        slide1 = zf.read("ppt/slides/slide1.xml").decode("utf-8")
+        slide2 = zf.read("ppt/slides/slide2.xml").decode("utf-8")
+
+    assert 'typeface="Arial"' in slide1
+    assert "Research-style redesigned by PPT Optimizer" in slide2
+    assert 'val="D60000"' in slide2
+    assert 'val="243A8F"' in slide2
+
+
 def test_parse_slide_selection() -> None:
     assert parse_slide_selection(None) is None
     assert parse_slide_selection("3") == (3,)

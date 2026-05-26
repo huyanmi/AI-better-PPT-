@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+from .research_redesign import redesign_slide_xml
+
 try:
     from PIL import Image
 except ImportError:  # pragma: no cover - optional dependency
@@ -43,6 +45,7 @@ class OptimizationOptions:
     image_quality: int = 82
     max_image_width: int | None = 2560
     slide_numbers: tuple[int, ...] | None = None
+    research_style: bool = False
 
 
 @dataclass
@@ -56,6 +59,7 @@ class DeckReport:
     comments_removed: int = 0
     images_seen: int = 0
     images_optimized: int = 0
+    slides_redesigned: int = 0
     bytes_saved: int = 0
     target_slides: tuple[int, ...] | None = None
     warnings: list[str] = field(default_factory=list)
@@ -70,6 +74,7 @@ class DeckReport:
             f"Comments removed: {self.comments_removed}",
             f"Images seen: {self.images_seen}",
             f"Images optimized: {self.images_optimized}",
+            f"Slides redesigned: {self.slides_redesigned}",
             f"Bytes saved: {self.bytes_saved}",
         ]
         if self.target_slides:
@@ -134,7 +139,7 @@ def optimize_pptx(
                 if name == CONTENT_TYPES:
                     data = _remove_content_type_overrides(data, options, related_parts)
                 elif SLIDE_RE.match(name) and _is_target_slide_part(name, report.target_slides):
-                    data = _optimize_slide_xml(data, options, report)
+                    data = _optimize_slide_xml(data, options, report, _slide_number_from_name(name))
                 elif MEDIA_RE.match(name) and _is_target_media_part(name, related_parts):
                     data = _optimize_image(data, name, options, report)
                 elif name.endswith(".rels"):
@@ -295,10 +300,17 @@ def _optimize_slide_xml(
     data: bytes,
     options: OptimizationOptions,
     report: DeckReport,
+    slide_number: int | None = None,
 ) -> bytes:
     root = ET.fromstring(data)
-    for run in root.findall(f".//{{{A_NS}}}r"):
-        report.text_runs += 1
+    runs = root.findall(f".//{{{A_NS}}}r")
+    report.text_runs += len(runs)
+
+    if options.research_style:
+        report.slides_redesigned += 1
+        return redesign_slide_xml(data, slide_number)
+
+    for run in runs:
         if options.font_family:
             if _set_run_font(run, options.font_family):
                 report.font_runs_changed += 1

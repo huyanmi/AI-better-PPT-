@@ -25,6 +25,7 @@ class PPTOptimizerApp:
         self.max_image_width = StringVar(value="2560")
         self.status = StringVar(value="请选择一个 PPTX 文件开始。")
         self.keep_notes = StringVar(value="0")
+        self.research_style = StringVar(value="0")
         self.result_queue: queue.Queue[tuple[str, object]] = queue.Queue()
         self.worker: threading.Thread | None = None
 
@@ -44,7 +45,7 @@ class PPTOptimizerApp:
 
         subtitle = ttk.Label(
             self.root,
-            text="上传 PPTX -> 选择页码和参数 -> 处理完成后保存优化版",
+            text="上传 PPTX -> 选择页码 -> 可勾选科研风重绘 -> 处理完成后保存优化版",
             font=("Microsoft YaHei", 10),
         )
         subtitle.grid(row=1, column=0, sticky="w", padx=24, pady=(0, 12))
@@ -85,14 +86,28 @@ class PPTOptimizerApp:
             offvalue="0",
         ).pack(side="left")
 
+        research = ttk.Frame(main)
+        research.grid(row=5, column=1, columnspan=2, sticky="ew", pady=(2, 8))
+        ttk.Checkbutton(
+            research,
+            text="科研风重绘（实验，建议只选 1 页）",
+            variable=self.research_style,
+            onvalue="1",
+            offvalue="0",
+        ).pack(side="left")
+        ttk.Label(
+            research,
+            text="会重排指定页的标题、流程图、证据矩阵和结论条",
+        ).pack(side="left", padx=(12, 0))
+
         buttons = ttk.Frame(main)
-        buttons.grid(row=5, column=1, columnspan=2, sticky="ew", pady=(12, 8))
+        buttons.grid(row=6, column=1, columnspan=2, sticky="ew", pady=(12, 8))
         self.run_button = ttk.Button(buttons, text="开始优化", command=self._start_optimize)
         self.run_button.pack(side="left")
         ttk.Button(buttons, text="打开输出目录", command=self._open_output_folder).pack(side="left", padx=10)
         ttk.Button(buttons, text="清空日志", command=self._clear_log).pack(side="left")
 
-        ttk.Label(main, textvariable=self.status).grid(row=6, column=0, columnspan=3, sticky="w", pady=(8, 6))
+        ttk.Label(main, textvariable=self.status).grid(row=7, column=0, columnspan=3, sticky="w", pady=(8, 6))
 
         self.log = self._make_text(main)
         self.log.grid(row=8, column=0, columnspan=3, sticky="nsew", pady=(6, 0))
@@ -160,6 +175,8 @@ class PPTOptimizerApp:
                 raise ValueError("目前只支持 .pptx 文件。")
             if not output.name:
                 raise ValueError("请选择保存位置。")
+            if self.research_style.get() == "1" and not self.slides.get().strip():
+                raise ValueError("科研风重绘需要填写页码，例如 3。这样不会误改整份 PPT。")
             quality = int(self.image_quality.get() or "82")
             max_width_raw = self.max_image_width.get().strip()
             max_width = int(max_width_raw) if max_width_raw else 0
@@ -169,14 +186,17 @@ class PPTOptimizerApp:
                 image_quality=max(1, min(quality, 95)),
                 max_image_width=max_width if max_width > 0 else None,
                 slide_numbers=parse_slide_selection(self.slides.get()),
+                research_style=self.research_style.get() == "1",
             )
         except Exception as exc:
             messagebox.showerror("参数错误", str(exc))
             return
 
-        self.status.set("正在优化，请稍等...")
+        mode = "科研风重绘" if options.research_style else "常规优化"
+        self.status.set("正在处理，请稍等...")
         self.run_button.configure(state=DISABLED)
         self._append_log("")
+        self._append_log(f"模式: {mode}")
         self._append_log(f"输入: {source}")
         self._append_log(f"输出: {output}")
 

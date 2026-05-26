@@ -33,6 +33,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Only optimize selected 1-based slide numbers, e.g. 3 or 2,5 or 3-6.",
     )
     parser.add_argument(
+        "--research-style",
+        action="store_true",
+        help=(
+            "Redesign selected slides into a Chinese research-report style "
+            "with title bars, diagrams, evidence tables, and conclusion strips. "
+            "Use together with --slides."
+        ),
+    )
+    parser.add_argument(
         "--keep-notes",
         action="store_true",
         help="Keep speaker notes instead of removing them.",
@@ -61,6 +70,8 @@ def main(argv: list[str] | None = None) -> int:
         output = args.input.with_name(f"{args.input.stem}.optimized{args.input.suffix}")
 
     try:
+        if args.research_style and not args.slides:
+            raise ValueError("--research-style must be used with --slides, e.g. --slides 3")
         options = OptimizationOptions(
             font_family=args.font or None,
             remove_notes=not args.keep_notes,
@@ -68,6 +79,7 @@ def main(argv: list[str] | None = None) -> int:
             image_quality=max(1, min(args.image_quality, 95)),
             max_image_width=args.max_image_width if args.max_image_width > 0 else None,
             slide_numbers=parse_slide_selection(args.slides),
+            research_style=args.research_style,
         )
         result = optimize_pptx(args.input, output, options)
     except Exception as exc:
