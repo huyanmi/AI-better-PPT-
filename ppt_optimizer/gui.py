@@ -99,7 +99,7 @@ class PPTOptimizerApp:
         ).pack(side="left")
         ttk.Label(
             research,
-            text="会重排指定页的标题、流程图、证据矩阵和结论条",
+            text="会按内容选择流程、架构、结果、矩阵等科研版式",
         ).pack(side="left", padx=(12, 0))
 
         buttons = ttk.Frame(main)

@@ -16,6 +16,7 @@
 - 支持只优化指定页，例如第 3 页或第 2、5-7 页。
 - 支持指定页“科研风重绘”：抽取原页文字后，重排为红蓝标题、架构图、
   证据矩阵、结论条等科研汇报版式。
+- 自动按内容选择架构图、方法流程、结果分析、证据矩阵等不同科研版式。
 - 支持传入参考 PPT 学习配色和字体，让重绘页更贴近目标答辩/科研汇报风格。
 
 ### 使用方法
@@ -113,8 +114,9 @@ JPEG/PNG images.
 - Remove speaker notes and comment authors.
 - Recompress oversized images when Pillow is available.
 - Write a new optimized copy without changing the original file.
-- Redesign selected slides into a Chinese research-report style with title bars,
-  diagrams, evidence tables, and conclusion strips.
+- Redesign selected slides into multiple Chinese research-report layouts,
+  including architecture maps, method flows, result boards, evidence tables,
+  and conclusion strips.
 - Learn colors and fonts from an optional reference PPTX for the redesign mode.
 
 ## Usage

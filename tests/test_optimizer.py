@@ -4,6 +4,7 @@ import zipfile
 from pathlib import Path
 
 from ppt_optimizer.optimizer import OptimizationOptions, optimize_pptx, parse_slide_selection
+from ppt_optimizer.research_redesign import classify_slide
 
 
 CONTENT_TYPES_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -247,6 +248,9 @@ def test_research_style_redesigns_only_selected_slide(tmp_path: Path) -> None:
     assert "Research-style redesigned by PPT Optimizer" in slide2
     assert 'val="D60000"' in slide2
     assert 'val="243A8F"' in slide2
+    assert 'prst="line"' in slide2
+    assert 'tailEnd type="triangle"' not in slide2
+    assert "rtTriangle" not in slide2
 
 
 def test_research_style_can_learn_reference_ppt_fonts_and_colors(tmp_path: Path) -> None:
@@ -273,6 +277,13 @@ def test_research_style_can_learn_reference_ppt_fonts_and_colors(tmp_path: Path)
     assert 'val="C00000"' in slide
     assert 'typeface="黑体"' in slide
     assert 'typeface="微软雅黑"' in slide
+
+
+def test_slide_classifier_uses_multiple_research_layouts() -> None:
+    assert classify_slide(["实验结果分析", "准确率", "ROC 曲线"]) == "results"
+    assert classify_slide(["特征提取方法", "训练流程", "数据集构建"]) == "workflow"
+    assert classify_slide(["系统架构", "LLM", "工具调用"]) == "architecture"
+    assert classify_slide(["现有方法局限性", "方法类别", "核心问题", "对比"]) == "matrix"
 
 
 def test_parse_slide_selection() -> None:

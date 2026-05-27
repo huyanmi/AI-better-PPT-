@@ -47,6 +47,18 @@ class ShapeBox:
     name: str = "Shape"
 
 
+@dataclass(frozen=True)
+class ConnectorBox:
+    x1: int
+    y1: int
+    x2: int
+    y2: int
+    color: str
+    width: int = 2
+    arrow: bool = True
+    name: str = "Connector"
+
+
 class SlideBuilder:
     def __init__(self, style: ReferenceStyle) -> None:
         self.style = style
@@ -55,6 +67,9 @@ class SlideBuilder:
 
     def shape(self, box: ShapeBox) -> None:
         self.parts.append(_shape_xml(self._next_id(), box))
+
+    def connector(self, box: ConnectorBox) -> None:
+        self.parts.append(_connector_xml(self._next_id(), box))
 
     def text(self, box: TextBox) -> None:
         if box.font is None:
@@ -109,7 +124,13 @@ def redesign_slide_xml(
     texts = extract_slide_text(data)
     profile = classify_slide(texts)
     if profile == "architecture":
+        if (slide_number or 1) % 2 == 0:
+            return _stack_architecture_slide(texts, slide_number, style)
         return _architecture_slide(texts, slide_number, style)
+    if profile == "workflow":
+        return _workflow_slide(texts, slide_number, style)
+    if profile == "results":
+        return _results_slide(texts, slide_number, style)
     if profile == "matrix":
         return _matrix_slide(texts, slide_number, style)
     return _summary_slide(texts, slide_number, style)
@@ -127,9 +148,15 @@ def extract_slide_text(data: bytes) -> list[str]:
 
 def classify_slide(texts: list[str]) -> str:
     joined = " ".join(texts)
-    if re.search(r"系统|架构|RAG|工具|调用|接口|LLM|模型层|治理层", joined, re.I):
+    if re.search(r"结果|实验|准确率|损失|曲线|ROC|消融|误差|分析|性能|精度|召回|F1", joined, re.I):
+        return "results"
+    if len(texts) >= 24 or re.search(r"局限|方法类别|核心问题|评测|指标|痛点|对比|矩阵|竞品|预算|计划", joined):
+        return "matrix"
+    if re.search(r"方法|流程|步骤|设计|实现|训练|平台|数据集|特征|分类|映射|Token|Prompt", joined, re.I):
+        return "workflow"
+    if re.search(r"系统|架构|RAG|工具|调用|接口|模型层|治理层|知识库|向量库", joined, re.I):
         return "architecture"
-    if len(texts) >= 18 or re.search(r"评测|指标|痛点|对比|矩阵|竞品|预算|计划", joined):
+    if len(texts) >= 18:
         return "matrix"
     return "summary"
 
@@ -165,6 +192,92 @@ def _architecture_slide(texts: list[str], slide_number: int | None, style: Refer
             builder.text(TextBox(x, 438, 220, 52, notes[index - 1], 14))
 
     builder.text(TextBox(84, 560, 900, 28, _conclusion(texts, "模型输出从文本生成升级为证据驱动的可执行决策。"), style.body_size + 2, style.accent, True))
+    return builder.xml()
+
+
+def _stack_architecture_slide(texts: list[str], slide_number: int | None, style: ReferenceStyle) -> bytes:
+    title_red, title_blue = _title_parts(texts, "系统架构", "分层治理与证据链闭环")
+    builder = _base_builder(title_red, title_blue, slide_number, style)
+
+    layers = [
+        ("输入治理", "任务意图\n权限边界\n数据清洗"),
+        ("知识增强", "检索召回\n证据排序\n上下文压缩"),
+        ("模型推理", "Prompt 规划\nLLM 生成\n自检修正"),
+        ("输出审计", "结果解释\n风险提示\n日志回放"),
+    ]
+    x0, y0, w, h = 92, 132, 530, 72
+    for index, (label, body) in enumerate(layers):
+        y = y0 + index * 96
+        fill = style.pale if index % 2 == 0 else "FFFFFF"
+        line = style.accent if index == len(layers) - 1 else style.secondary
+        builder.shape(ShapeBox(x0, y, w, h, fill, line))
+        builder.text(TextBox(x0 + 24, y + 18, 118, 28, label, style.body_size + 2, line, True))
+        builder.text(TextBox(x0 + 168, y + 14, 292, 34, body, max(13, style.body_size - 2)))
+        if index < len(layers) - 1:
+            _arrow(builder, x0 + w // 2, y + h + 8, 0, style.secondary, vertical=26)
+
+    builder.shape(ShapeBox(720, 138, 420, 330, "FFFFFF", style.border))
+    builder.text(TextBox(748, 166, 220, 28, "科研表达重点", style.title_size - 6, style.primary, True))
+    callouts = _evidence_notes(texts)
+    labels = ["主旨先行", "证据承载", "风险闭环"]
+    for index, label in enumerate(labels):
+        y = 218 + index * 78
+        color = style.accent if index == 2 else style.primary
+        builder.shape(ShapeBox(750, y + 8, 10, 10, color, None, "ellipse"))
+        builder.text(TextBox(774, y, 108, 22, label, style.body_size, color, True))
+        builder.text(TextBox(892, y - 2, 206, 36, callouts[index], max(12, style.body_size - 3)))
+
+    _conclusion_bar(builder, texts, style, "分层架构页应同时回答“模块是什么、证据在哪里、风险如何闭环”。")
+    return builder.xml()
+
+
+def _workflow_slide(texts: list[str], slide_number: int | None, style: ReferenceStyle) -> bytes:
+    title_red, title_blue = _title_parts(texts, "方法流程", "从问题定义到实验验证的研究路径")
+    builder = _base_builder(title_red, title_blue, slide_number, style)
+
+    steps = _workflow_steps(texts)
+    x_positions = [76, 356, 636, 916]
+    y_positions = [176, 286, 176, 286]
+    for index, (label, body) in enumerate(steps):
+        x, y = x_positions[index], y_positions[index]
+        color = style.accent if index == len(steps) - 1 else style.primary
+        builder.shape(ShapeBox(x, y, 190, 106, "FFFFFF", color))
+        builder.shape(ShapeBox(x + 16, y - 26, 42, 42, color, None, "ellipse"))
+        builder.text(TextBox(x + 25, y - 17, 24, 18, f"{index + 1}", 17, "FFFFFF", True, "center", fill=color))
+        builder.text(TextBox(x + 22, y + 20, 140, 22, label, style.body_size + 1, color, True))
+        builder.text(TextBox(x + 22, y + 52, 140, 34, body, max(12, style.body_size - 3)))
+        if index < len(steps) - 1:
+            start_x = x + 190
+            start_y = y + 53
+            end_x = x_positions[index + 1] - 18
+            end_y = y_positions[index + 1] + 53
+            builder.connector(ConnectorBox(start_x, start_y, end_x, end_y, style.secondary))
+
+    builder.shape(ShapeBox(78, 466, 1030, 58, style.pale, style.border))
+    builder.text(TextBox(104, 484, 112, 18, "设计原则", style.body_size, style.primary, True))
+    builder.text(TextBox(226, 478, 790, 30, _conclusion(texts, "流程页应呈现清晰的阅读路径：问题、方法、验证与输出逐步收束。"), style.body_size))
+    _conclusion_bar(builder, texts, style, "方法流程要避免堆文字，关键是让评审一眼看出变量、步骤和验证关系。", y=558)
+    return builder.xml()
+
+
+def _results_slide(texts: list[str], slide_number: int | None, style: ReferenceStyle) -> bytes:
+    title_red, title_blue = _title_parts(texts, "结果分析", "指标、对比与结论的证据板")
+    builder = _base_builder(title_red, title_blue, slide_number, style)
+
+    builder.shape(ShapeBox(72, 132, 610, 330, "FFFFFF", style.border))
+    builder.text(TextBox(96, 158, 230, 24, "核心证据图", style.body_size + 2, style.primary, True))
+    _mini_chart(builder, 116, 226, 500, 160, style)
+    builder.text(TextBox(116, 400, 480, 26, _conclusion(texts, "结果页优先展示关键指标变化，再解释原因和适用边界。"), max(13, style.body_size - 2), style.muted))
+
+    findings = _bullets(texts, 3)
+    for index, finding in enumerate(findings):
+        y = 138 + index * 104
+        color = style.accent if index == 0 else style.primary
+        builder.shape(ShapeBox(738, y, 390, 76, style.pale if index == 0 else "FFFFFF", style.border))
+        builder.text(TextBox(760, y + 16, 70, 20, f"发现 {index + 1}", max(13, style.body_size - 2), color, True))
+        builder.text(TextBox(842, y + 12, 246, 34, finding, max(13, style.body_size - 2)))
+
+    _conclusion_bar(builder, texts, style, "结果页应先给结论，再用图表、对比和误差解释支撑判断。")
     return builder.xml()
 
 
@@ -246,9 +359,25 @@ def _section(builder: SlideBuilder, label: str, x: int, y: int, w: int, color: s
     builder.text(TextBox(x + 6, y + 4, w - 12, 16, label, 13, "FFFFFF", True, "center", fill=color))
 
 
-def _arrow(builder: SlideBuilder, x: int, y: int, w: int, color: str = "4F7DB9") -> None:
-    builder.shape(ShapeBox(x, y + 8, w, 3, color, None))
-    builder.shape(ShapeBox(x + w - 2, y, 18, 18, color, None, "rtTriangle"))
+def _arrow(
+    builder: SlideBuilder,
+    x: int,
+    y: int,
+    w: int,
+    color: str = "4F7DB9",
+    vertical: int = 0,
+) -> None:
+    end_x = x + w
+    end_y = y + vertical
+    builder.connector(ConnectorBox(x, y, end_x, end_y, color, arrow=False))
+    if vertical:
+        direction = 1 if vertical > 0 else -1
+        builder.connector(ConnectorBox(end_x, end_y, end_x - 5, end_y - direction * 8, color, arrow=False))
+        builder.connector(ConnectorBox(end_x, end_y, end_x + 5, end_y - direction * 8, color, arrow=False))
+        return
+    direction = 1 if w >= 0 else -1
+    builder.connector(ConnectorBox(end_x, end_y, end_x - direction * 9, end_y - 5, color, arrow=False))
+    builder.connector(ConnectorBox(end_x, end_y, end_x - direction * 9, end_y + 5, color, arrow=False))
 
 
 def _table_cell(
@@ -265,6 +394,50 @@ def _table_cell(
     style: ReferenceStyle,
 ) -> None:
     builder.text(TextBox(x, y, w, h, text, size, color, bold, "center", fill, style.border))
+
+
+def _conclusion_bar(
+    builder: SlideBuilder,
+    texts: list[str],
+    style: ReferenceStyle,
+    fallback: str,
+    y: int = 540,
+) -> None:
+    builder.shape(ShapeBox(72, y, 1060, 54, _light_accent(style.accent), style.accent))
+    builder.text(TextBox(98, y + 18, 76, 18, "结论", max(14, style.body_size - 1), style.accent, True))
+    builder.text(TextBox(184, y + 13, 806, 24, _conclusion(texts, fallback), style.body_size, style.body, True))
+
+
+def _workflow_steps(texts: list[str]) -> list[tuple[str, str]]:
+    labels = ["问题定义", "方法构建", "实验验证", "结果输出"]
+    bullets = _bullets(texts, 8)
+    while len(bullets) < 8:
+        bullets.append("")
+    defaults = [
+        "明确目标与约束",
+        "形成模型或算法路径",
+        "用指标检验有效性",
+        "沉淀结论与边界",
+    ]
+    return [
+        (label, bullets[index * 2] or defaults[index])
+        for index, label in enumerate(labels)
+    ]
+
+
+def _mini_chart(builder: SlideBuilder, x: int, y: int, w: int, h: int, style: ReferenceStyle) -> None:
+    builder.shape(ShapeBox(x, y + h, w, 2, style.border, None))
+    builder.shape(ShapeBox(x, y, 2, h, style.border, None))
+    bars = [0.46, 0.62, 0.78, 0.88]
+    labels = ["Baseline", "RAG", "Tool", "Ours"]
+    bar_w = 54
+    gap = 62
+    for index, value in enumerate(bars):
+        bx = x + 72 + index * (bar_w + gap)
+        bh = int(h * value)
+        color = style.accent if index == len(bars) - 1 else style.secondary
+        builder.shape(ShapeBox(bx, y + h - bh, bar_w, bh, color, None))
+        builder.text(TextBox(bx - 8, y + h + 12, bar_w + 16, 16, labels[index], 10, style.muted, align="center"))
 
 
 def _title_parts(texts: list[str], fallback_red: str, fallback_blue: str) -> tuple[str, str]:
@@ -412,6 +585,27 @@ def _shape_xml(shape_id: int, box: ShapeBox) -> str:
           <a:prstGeom prst="{box.geometry}"><a:avLst/></a:prstGeom>
           {_fill_xml(box.fill)}
           {_line_xml(box.line)}
+        </p:spPr>
+      </p:sp>"""
+
+
+def _connector_xml(shape_id: int, box: ConnectorBox) -> str:
+    x = min(box.x1, box.x2)
+    y = min(box.y1, box.y2)
+    w = max(1, abs(box.x2 - box.x1))
+    h = max(1, abs(box.y2 - box.y1))
+    flip_h = ' flipH="1"' if box.x2 < box.x1 else ""
+    flip_v = ' flipV="1"' if box.y2 < box.y1 else ""
+    end_xml = '<a:tailEnd type="triangle" w="sm" len="sm"/>' if box.arrow else ""
+    return f"""      <p:sp>
+        <p:nvSpPr><p:cNvPr id="{shape_id}" name="{_xml(box.name)}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm{flip_h}{flip_v}><a:off x="{_emu(x)}" y="{_emu(y)}"/><a:ext cx="{_emu(w)}" cy="{_emu(h)}"/></a:xfrm>
+          <a:prstGeom prst="line"><a:avLst/></a:prstGeom>
+          <a:ln w="{box.width * 6350}">
+            <a:solidFill><a:srgbClr val="{box.color}"/></a:solidFill>
+            {end_xml}
+          </a:ln>
         </p:spPr>
       </p:sp>"""
 
