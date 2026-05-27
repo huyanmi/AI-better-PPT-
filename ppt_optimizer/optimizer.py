@@ -9,6 +9,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from .research_redesign import redesign_slide_xml
+from .style_reference import ReferenceStyle, analyze_reference_style, summarize_style
 
 try:
     from PIL import Image
@@ -46,6 +47,7 @@ class OptimizationOptions:
     max_image_width: int | None = 2560
     slide_numbers: tuple[int, ...] | None = None
     research_style: bool = False
+    reference_ppt: Path | None = None
 
 
 @dataclass
@@ -62,6 +64,7 @@ class DeckReport:
     slides_redesigned: int = 0
     bytes_saved: int = 0
     target_slides: tuple[int, ...] | None = None
+    reference_style: str | None = None
     warnings: list[str] = field(default_factory=list)
 
     def to_text(self) -> str:
@@ -79,6 +82,8 @@ class DeckReport:
         ]
         if self.target_slides:
             lines.insert(2, f"Target slides: {', '.join(str(n) for n in self.target_slides)}")
+        if self.reference_style:
+            lines.insert(3 if self.target_slides else 2, f"Reference style: {self.reference_style}")
         if self.output:
             lines.append(f"Output: {self.output}")
         if self.warnings:
@@ -108,6 +113,7 @@ def optimize_pptx(
         output = output.resolve()
 
     report = DeckReport(source=source, output=output)
+    reference_style = _load_reference_style(options, report)
 
     with zipfile.ZipFile(source, "r") as zin:
         names = zin.namelist()
@@ -139,7 +145,13 @@ def optimize_pptx(
                 if name == CONTENT_TYPES:
                     data = _remove_content_type_overrides(data, options, related_parts)
                 elif SLIDE_RE.match(name) and _is_target_slide_part(name, report.target_slides):
-                    data = _optimize_slide_xml(data, options, report, _slide_number_from_name(name))
+                    data = _optimize_slide_xml(
+                        data,
+                        options,
+                        report,
+                        _slide_number_from_name(name),
+                        reference_style,
+                    )
                 elif MEDIA_RE.match(name) and _is_target_media_part(name, related_parts):
                     data = _optimize_image(data, name, options, report)
                 elif name.endswith(".rels"):
@@ -301,6 +313,7 @@ def _optimize_slide_xml(
     options: OptimizationOptions,
     report: DeckReport,
     slide_number: int | None = None,
+    reference_style: ReferenceStyle | None = None,
 ) -> bytes:
     root = ET.fromstring(data)
     runs = root.findall(f".//{{{A_NS}}}r")
@@ -308,13 +321,25 @@ def _optimize_slide_xml(
 
     if options.research_style:
         report.slides_redesigned += 1
-        return redesign_slide_xml(data, slide_number)
+        return redesign_slide_xml(data, slide_number, reference_style)
 
     for run in runs:
         if options.font_family:
             if _set_run_font(run, options.font_family):
                 report.font_runs_changed += 1
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
+def _load_reference_style(options: OptimizationOptions, report: DeckReport) -> ReferenceStyle | None:
+    if not options.reference_ppt:
+        return None
+    try:
+        style = analyze_reference_style(options.reference_ppt)
+    except Exception as exc:
+        report.warnings.append(f"Reference PPT style could not be loaded; using defaults. {exc}")
+        return None
+    report.reference_style = summarize_style(style)
+    return style
 
 
 def _set_run_font(run: ET.Element, font_family: str) -> bool:

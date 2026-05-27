@@ -16,6 +16,7 @@
 - 支持只优化指定页，例如第 3 页或第 2、5-7 页。
 - 支持指定页“科研风重绘”：抽取原页文字后，重排为红蓝标题、架构图、
   证据矩阵、结论条等科研汇报版式。
+- 支持传入参考 PPT 学习配色和字体，让重绘页更贴近目标答辩/科研汇报风格。
 
 ### 使用方法
 
@@ -47,6 +48,12 @@ python -m ppt_optimizer input.pptx -o optimized.pptx --slides 3
 
 ```powershell
 python -m ppt_optimizer input.pptx -o research-style.pptx --slides 3 --research-style
+```
+
+参考另一份 PPT 的配色和字体再重绘：
+
+```powershell
+python -m ppt_optimizer input.pptx -o research-style.pptx --slides 3 --research-style --reference-ppt "C:\Users\22625\Desktop\大四\毕业设计\毕设答辩.pptx"
 ```
 
 只优化多页：
@@ -89,7 +96,7 @@ dist\PPTOptimizer.exe
 
 如果你想看到明显的科研风视觉变化，请使用 `--research-style --slides 页码`，或在 EXE
 里勾选“科研风重绘”。这个模式会重绘指定页，适合先对单页做精确优化，再逐步扩展到整份
-PPT。
+PPT。也可以同时选择“参考 PPT”，程序会从参考文件中学习主色、强调色和中文字体。
 
 ## English
 
@@ -108,6 +115,7 @@ JPEG/PNG images.
 - Write a new optimized copy without changing the original file.
 - Redesign selected slides into a Chinese research-report style with title bars,
   diagrams, evidence tables, and conclusion strips.
+- Learn colors and fonts from an optional reference PPTX for the redesign mode.
 
 ## Usage
 
@@ -140,6 +148,12 @@ Redesign one slide into the research-report style:
 python -m ppt_optimizer input.pptx -o research-style.pptx --slides 3 --research-style
 ```
 
+Redesign with a reference deck:
+
+```powershell
+python -m ppt_optimizer input.pptx -o research-style.pptx --slides 3 --research-style --reference-ppt reference.pptx
+```
+
 Run the desktop UI:
 
 ```powershell
@@ -159,4 +173,5 @@ The optimizer is intentionally conservative. It keeps layout, animations, charts
 and slide masters intact while changing only scoped XML/package parts.
 
 Use `--research-style` with `--slides` when you want a visible one-slide layout
-redesign instead of a conservative cleanup.
+redesign instead of a conservative cleanup. Add `--reference-ppt` when you want
+the redesign to inherit a reference deck's fonts and palette.

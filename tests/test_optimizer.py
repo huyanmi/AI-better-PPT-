@@ -46,6 +46,29 @@ RELS_XML_2 = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 """
 
 
+REFERENCE_STYLE_SLIDE_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+       xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:sp>
+        <p:spPr>
+          <a:solidFill><a:srgbClr val="0070C0"/></a:solidFill>
+          <a:ln><a:solidFill><a:srgbClr val="C00000"/></a:solidFill></a:ln>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p><a:r><a:rPr sz="2000"><a:latin typeface="黑体"/><a:ea typeface="黑体"/><a:solidFill><a:srgbClr val="0070C0"/></a:solidFill></a:rPr><a:t>参考标题</a:t></a:r></a:p>
+          <a:p><a:r><a:rPr sz="1800"><a:latin typeface="微软雅黑"/><a:ea typeface="微软雅黑"/><a:solidFill><a:srgbClr val="C00000"/></a:solidFill></a:rPr><a:t>参考正文</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:sld>
+"""
+
+
 def make_minimal_pptx(path: Path) -> None:
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("[Content_Types].xml", CONTENT_TYPES_XML)
@@ -74,6 +97,11 @@ def make_two_slide_pptx(path: Path) -> None:
         zf.writestr("ppt/notesSlides/notesSlide2.xml", "<notes/>")
         zf.writestr("ppt/notesSlides/_rels/notesSlide1.xml.rels", "<Relationships/>")
         zf.writestr("ppt/notesSlides/_rels/notesSlide2.xml.rels", "<Relationships/>")
+
+
+def make_reference_pptx(path: Path) -> None:
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("ppt/slides/slide1.xml", REFERENCE_STYLE_SLIDE_XML)
 
 
 def test_optimize_sets_font_and_removes_notes(tmp_path: Path) -> None:
@@ -219,6 +247,32 @@ def test_research_style_redesigns_only_selected_slide(tmp_path: Path) -> None:
     assert "Research-style redesigned by PPT Optimizer" in slide2
     assert 'val="D60000"' in slide2
     assert 'val="243A8F"' in slide2
+
+
+def test_research_style_can_learn_reference_ppt_fonts_and_colors(tmp_path: Path) -> None:
+    source = tmp_path / "deck.pptx"
+    reference = tmp_path / "reference.pptx"
+    output = tmp_path / "deck.reference-style.pptx"
+    make_minimal_pptx(source)
+    make_reference_pptx(reference)
+
+    report = optimize_pptx(
+        source,
+        output,
+        OptimizationOptions(slide_numbers=(1,), research_style=True, reference_ppt=reference),
+    )
+
+    assert report.slides_redesigned == 1
+    assert report.reference_style is not None
+    assert "primary=#0070C0" in report.reference_style
+
+    with zipfile.ZipFile(output) as zf:
+        slide = zf.read("ppt/slides/slide1.xml").decode("utf-8")
+
+    assert 'val="0070C0"' in slide
+    assert 'val="C00000"' in slide
+    assert 'typeface="黑体"' in slide
+    assert 'typeface="微软雅黑"' in slide
 
 
 def test_parse_slide_selection() -> None:

@@ -14,11 +14,12 @@ class PPTOptimizerApp:
     def __init__(self, root: Tk) -> None:
         self.root = root
         self.root.title("PPT Optimizer")
-        self.root.geometry("760x560")
-        self.root.minsize(720, 520)
+        self.root.geometry("820x620")
+        self.root.minsize(760, 580)
 
         self.input_path = StringVar()
         self.output_path = StringVar()
+        self.reference_path = StringVar()
         self.font_family = StringVar(value="Microsoft YaHei")
         self.slides = StringVar()
         self.image_quality = StringVar(value="82")
@@ -53,27 +54,28 @@ class PPTOptimizerApp:
         main = ttk.Frame(self.root, padding=(22, 4, 22, 10))
         main.grid(row=2, column=0, sticky="nsew")
         main.columnconfigure(1, weight=1)
-        main.rowconfigure(8, weight=1)
+        main.rowconfigure(9, weight=1)
 
         self._row(main, 0, "上传 PPTX", self.input_path, self._choose_input, "选择文件")
         self._row(main, 1, "保存为", self.output_path, self._choose_output, "选择位置")
+        self._row(main, 2, "参考 PPT", self.reference_path, self._choose_reference, "选择参考")
 
-        ttk.Label(main, text="页码").grid(row=2, column=0, sticky="w", pady=8)
-        ttk.Entry(main, textvariable=self.slides).grid(row=2, column=1, sticky="ew", pady=8)
+        ttk.Label(main, text="页码").grid(row=3, column=0, sticky="w", pady=8)
+        ttk.Entry(main, textvariable=self.slides).grid(row=3, column=1, sticky="ew", pady=8)
         ttk.Label(main, text="留空表示整份 PPT；示例：3 或 2,5-7").grid(
-            row=2,
+            row=3,
             column=2,
             sticky="w",
             padx=(10, 0),
             pady=8,
         )
 
-        ttk.Label(main, text="字体").grid(row=3, column=0, sticky="w", pady=8)
-        ttk.Entry(main, textvariable=self.font_family).grid(row=3, column=1, sticky="ew", pady=8)
-        ttk.Label(main, text="留空则不统一字体").grid(row=3, column=2, sticky="w", padx=(10, 0), pady=8)
+        ttk.Label(main, text="字体").grid(row=4, column=0, sticky="w", pady=8)
+        ttk.Entry(main, textvariable=self.font_family).grid(row=4, column=1, sticky="ew", pady=8)
+        ttk.Label(main, text="留空则不统一字体").grid(row=4, column=2, sticky="w", padx=(10, 0), pady=8)
 
         options = ttk.Frame(main)
-        options.grid(row=4, column=1, columnspan=2, sticky="ew", pady=8)
+        options.grid(row=5, column=1, columnspan=2, sticky="ew", pady=8)
         ttk.Label(options, text="图片质量").pack(side="left")
         ttk.Entry(options, textvariable=self.image_quality, width=8).pack(side="left", padx=(8, 18))
         ttk.Label(options, text="最大图片宽度").pack(side="left")
@@ -87,7 +89,7 @@ class PPTOptimizerApp:
         ).pack(side="left")
 
         research = ttk.Frame(main)
-        research.grid(row=5, column=1, columnspan=2, sticky="ew", pady=(2, 8))
+        research.grid(row=6, column=1, columnspan=2, sticky="ew", pady=(2, 8))
         ttk.Checkbutton(
             research,
             text="科研风重绘（实验，建议只选 1 页）",
@@ -101,16 +103,16 @@ class PPTOptimizerApp:
         ).pack(side="left", padx=(12, 0))
 
         buttons = ttk.Frame(main)
-        buttons.grid(row=6, column=1, columnspan=2, sticky="ew", pady=(12, 8))
+        buttons.grid(row=7, column=1, columnspan=2, sticky="ew", pady=(12, 8))
         self.run_button = ttk.Button(buttons, text="开始优化", command=self._start_optimize)
         self.run_button.pack(side="left")
         ttk.Button(buttons, text="打开输出目录", command=self._open_output_folder).pack(side="left", padx=10)
         ttk.Button(buttons, text="清空日志", command=self._clear_log).pack(side="left")
 
-        ttk.Label(main, textvariable=self.status).grid(row=7, column=0, columnspan=3, sticky="w", pady=(8, 6))
+        ttk.Label(main, textvariable=self.status).grid(row=8, column=0, columnspan=3, sticky="w", pady=(8, 6))
 
         self.log = self._make_text(main)
-        self.log.grid(row=8, column=0, columnspan=3, sticky="nsew", pady=(6, 0))
+        self.log.grid(row=9, column=0, columnspan=3, sticky="nsew", pady=(6, 0))
         self._append_log("准备就绪。")
 
     def _row(
@@ -161,6 +163,14 @@ class PPTOptimizerApp:
         if path:
             self.output_path.set(path)
 
+    def _choose_reference(self) -> None:
+        path = filedialog.askopenfilename(
+            title="选择用于学习风格的参考 PPTX",
+            filetypes=[("PowerPoint", "*.pptx"), ("All files", "*.*")],
+        )
+        if path:
+            self.reference_path.set(path)
+
     def _start_optimize(self) -> None:
         if self.worker and self.worker.is_alive():
             messagebox.showinfo("正在处理", "当前 PPT 还在处理中，请稍等。")
@@ -177,6 +187,13 @@ class PPTOptimizerApp:
                 raise ValueError("请选择保存位置。")
             if self.research_style.get() == "1" and not self.slides.get().strip():
                 raise ValueError("科研风重绘需要填写页码，例如 3。这样不会误改整份 PPT。")
+            reference = None
+            if self.reference_path.get().strip():
+                reference = Path(self.reference_path.get()).expanduser()
+                if not reference.exists():
+                    raise ValueError("参考 PPT 不存在，请重新选择。")
+                if reference.suffix.lower() != ".pptx":
+                    raise ValueError("参考 PPT 目前只支持 .pptx 文件。")
             quality = int(self.image_quality.get() or "82")
             max_width_raw = self.max_image_width.get().strip()
             max_width = int(max_width_raw) if max_width_raw else 0
@@ -187,6 +204,7 @@ class PPTOptimizerApp:
                 max_image_width=max_width if max_width > 0 else None,
                 slide_numbers=parse_slide_selection(self.slides.get()),
                 research_style=self.research_style.get() == "1",
+                reference_ppt=reference,
             )
         except Exception as exc:
             messagebox.showerror("参数错误", str(exc))
@@ -198,6 +216,8 @@ class PPTOptimizerApp:
         self._append_log("")
         self._append_log(f"模式: {mode}")
         self._append_log(f"输入: {source}")
+        if options.reference_ppt:
+            self._append_log(f"参考: {options.reference_ppt}")
         self._append_log(f"输出: {output}")
 
         self.worker = threading.Thread(

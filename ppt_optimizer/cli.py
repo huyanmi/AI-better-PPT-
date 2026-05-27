@@ -42,6 +42,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--reference-ppt",
+        type=Path,
+        help="Optional reference .pptx used to learn fonts and colors for --research-style.",
+    )
+    parser.add_argument(
         "--keep-notes",
         action="store_true",
         help="Keep speaker notes instead of removing them.",
@@ -80,6 +85,7 @@ def main(argv: list[str] | None = None) -> int:
             max_image_width=args.max_image_width if args.max_image_width > 0 else None,
             slide_numbers=parse_slide_selection(args.slides),
             research_style=args.research_style,
+            reference_ppt=args.reference_ppt,
         )
         result = optimize_pptx(args.input, output, options)
     except Exception as exc:

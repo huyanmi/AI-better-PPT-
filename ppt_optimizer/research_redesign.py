@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape
+
+from .style_reference import DEFAULT_STYLE, ReferenceStyle
 
 
 A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -29,7 +31,7 @@ class TextBox:
     align: str = "left"
     fill: str = "none"
     line: str | None = None
-    font: str = "Microsoft YaHei"
+    font: str | None = None
     name: str = "Text"
 
 
@@ -46,7 +48,8 @@ class ShapeBox:
 
 
 class SlideBuilder:
-    def __init__(self) -> None:
+    def __init__(self, style: ReferenceStyle) -> None:
+        self.style = style
         self.parts: list[str] = []
         self.shape_id = 2
 
@@ -54,6 +57,8 @@ class SlideBuilder:
         self.parts.append(_shape_xml(self._next_id(), box))
 
     def text(self, box: TextBox) -> None:
+        if box.font is None:
+            box = replace(box, font=self.style.body_font)
         self.parts.append(_text_xml(self._next_id(), box))
 
     def _next_id(self) -> int:
@@ -95,14 +100,19 @@ class SlideBuilder:
         return xml.encode("utf-8")
 
 
-def redesign_slide_xml(data: bytes, slide_number: int | None = None) -> bytes:
+def redesign_slide_xml(
+    data: bytes,
+    slide_number: int | None = None,
+    style: ReferenceStyle | None = None,
+) -> bytes:
+    style = style or DEFAULT_STYLE
     texts = extract_slide_text(data)
     profile = classify_slide(texts)
     if profile == "architecture":
-        return _architecture_slide(texts, slide_number)
+        return _architecture_slide(texts, slide_number, style)
     if profile == "matrix":
-        return _matrix_slide(texts, slide_number)
-    return _summary_slide(texts, slide_number)
+        return _matrix_slide(texts, slide_number, style)
+    return _summary_slide(texts, slide_number, style)
 
 
 def extract_slide_text(data: bytes) -> list[str]:
@@ -124,9 +134,9 @@ def classify_slide(texts: list[str]) -> str:
     return "summary"
 
 
-def _architecture_slide(texts: list[str], slide_number: int | None) -> bytes:
+def _architecture_slide(texts: list[str], slide_number: int | None, style: ReferenceStyle) -> bytes:
     title_red, title_blue = _title_parts(texts, "系统架构", "RAG、工具调用与策略约束协同")
-    builder = _base_builder(title_red, title_blue, slide_number)
+    builder = _base_builder(title_red, title_blue, slide_number, style)
 
     lanes = [
         ("接入层", "用户问题\n权限与策略\n日志采集"),
@@ -138,37 +148,37 @@ def _architecture_slide(texts: list[str], slide_number: int | None) -> bytes:
     ]
     for index, (label, body) in enumerate(lanes):
         x = 48 + index * 196
-        color = "D60000" if index == len(lanes) - 1 else "4F7DB9"
+        color = style.accent if index == len(lanes) - 1 else style.secondary
         _section(builder, label, x, 138, 142, color)
         builder.text(TextBox(x, 180, 142, 124, body, 15, align="center", line=color))
         if index < len(lanes) - 1:
-            _arrow(builder, x + 144, 230, 44)
+            _arrow(builder, x + 144, 230, 44, style.secondary)
 
-    builder.shape(ShapeBox(74, 378, 1070, 138, "F4F7FD", "B8C6DB"))
+    builder.shape(ShapeBox(74, 378, 1070, 138, style.pale, style.border))
     notes = _evidence_notes(texts)
     headings = ["关键设计", "证据优先", "工具受控", "全链路审计"]
     for index, heading in enumerate(headings):
         x = 102 + index * 260
-        color = "D60000" if index == 3 else "243A8F"
+        color = style.accent if index == 3 else style.primary
         builder.text(TextBox(x, 404, 180, 24, heading, 18, color, True))
         if index > 0:
             builder.text(TextBox(x, 438, 220, 52, notes[index - 1], 14))
 
-    builder.text(TextBox(84, 560, 900, 28, _conclusion(texts, "模型输出从文本生成升级为证据驱动的可执行决策。"), 20, "D60000", True))
+    builder.text(TextBox(84, 560, 900, 28, _conclusion(texts, "模型输出从文本生成升级为证据驱动的可执行决策。"), style.body_size + 2, style.accent, True))
     return builder.xml()
 
 
-def _matrix_slide(texts: list[str], slide_number: int | None) -> bytes:
+def _matrix_slide(texts: list[str], slide_number: int | None, style: ReferenceStyle) -> bytes:
     title_red, title_blue = _title_parts(texts, "评测体系", "任务簇、失败模式与科研证据矩阵")
-    builder = _base_builder(title_red, title_blue, slide_number)
-    builder.text(TextBox(48, 92, 920, 24, "将页面信息重排为科研汇报中更常见的表格证据结构，突出问题、证据和改进机制。", 15, "6E747A"))
+    builder = _base_builder(title_red, title_blue, slide_number, style)
+    builder.text(TextBox(48, 92, 920, 24, "将页面信息重排为科研汇报中更常见的表格证据结构，突出问题、证据和改进机制。", max(13, style.body_size - 2), style.muted))
 
     headers = ["方面", "核心信息", "证据/样本", "风险或不足", "优化方向"]
     widths = [120, 220, 250, 250, 300]
     x0, y0 = 50, 136
     x = x0
     for header, width in zip(headers, widths):
-        _table_cell(builder, header, x, y0, width, 38, "4F7DB9", "FFFFFF", True, 16)
+        _table_cell(builder, header, x, y0, width, 38, style.secondary, "FFFFFF", True, max(14, style.body_size - 1), style)
         x += width
 
     rows = _matrix_rows(texts)
@@ -176,25 +186,25 @@ def _matrix_slide(texts: list[str], slide_number: int | None) -> bytes:
         y = y0 + 38 + row_index * 74
         x = x0
         for col_index, (value, width) in enumerate(zip(row, widths)):
-            fill = "EDF3FC" if col_index == 0 else "FFFFFF"
-            color = "D60000" if col_index == 3 else "1E1E1E"
-            _table_cell(builder, value, x, y, width, 74, fill, color, col_index in (0, 3), 13)
+            fill = style.pale if col_index == 0 else "FFFFFF"
+            color = style.accent if col_index == 3 else style.body
+            _table_cell(builder, value, x, y, width, 74, fill, color, col_index in (0, 3), max(12, style.body_size - 4), style)
             x += width
 
-    builder.text(TextBox(58, 558, 1060, 24, _conclusion(texts, "科研型 PPT 应把信息组织成可验证的问题、证据和方案链路。"), 18, "D60000", True))
+    builder.text(TextBox(58, 558, 1060, 24, _conclusion(texts, "科研型 PPT 应把信息组织成可验证的问题、证据和方案链路。"), style.body_size, style.accent, True))
     return builder.xml()
 
 
-def _summary_slide(texts: list[str], slide_number: int | None) -> bytes:
+def _summary_slide(texts: list[str], slide_number: int | None, style: ReferenceStyle) -> bytes:
     title_red, title_blue = _title_parts(texts, "研究结论", "从文字堆叠转向结构化科研叙事")
-    builder = _base_builder(title_red, title_blue, slide_number)
+    builder = _base_builder(title_red, title_blue, slide_number, style)
 
-    builder.text(TextBox(52, 108, 500, 28, "核心判断", 22, "D60000", True))
+    builder.text(TextBox(52, 108, 500, 28, "核心判断", style.title_size - 4, style.accent, True))
     bullets = _bullets(texts, 5)
     for index, bullet in enumerate(bullets):
         y = 158 + index * 54
-        builder.shape(ShapeBox(62, y + 8, 10, 10, "FFFFFF", "243A8F"))
-        builder.text(TextBox(86, y, 510, 36, bullet, 17))
+        builder.shape(ShapeBox(62, y + 8, 10, 10, "FFFFFF", style.primary))
+        builder.text(TextBox(86, y, 510, 36, bullet, style.body_size))
 
     loop = [
         ("研究问题", "定义目标"),
@@ -205,29 +215,29 @@ def _summary_slide(texts: list[str], slide_number: int | None) -> bytes:
     for index, (label, body) in enumerate(loop):
         x = 660 + (index % 2) * 250
         y = 150 + (index // 2) * 168
-        color = "D60000" if index == 3 else "4F7DB9"
+        color = style.accent if index == 3 else style.secondary
         _section(builder, label, x, y, 160, color)
         builder.text(TextBox(x, y + 42, 160, 82, body, 20, color, True, "center", line=color))
-    _arrow(builder, 820, 205, 80)
-    _arrow(builder, 820, 373, 80)
-    builder.shape(ShapeBox(736, 274, 3, 58, "243A8F"))
-    builder.shape(ShapeBox(986, 274, 3, 58, "D60000"))
+    _arrow(builder, 820, 205, 80, style.secondary)
+    _arrow(builder, 820, 373, 80, style.secondary)
+    builder.shape(ShapeBox(736, 274, 3, 58, style.primary))
+    builder.shape(ShapeBox(986, 274, 3, 58, style.accent))
 
-    builder.shape(ShapeBox(72, 526, 1060, 58, "FFF7F7", "D60000"))
-    builder.text(TextBox(96, 544, 70, 18, "结论", 16, "D60000", True))
-    builder.text(TextBox(176, 540, 830, 26, _conclusion(texts, "该页已重排为红蓝标题、结构化要点和科研汇报结论栏。"), 18))
+    builder.shape(ShapeBox(72, 526, 1060, 58, _light_accent(style.accent), style.accent))
+    builder.text(TextBox(96, 544, 70, 18, "结论", max(14, style.body_size - 1), style.accent, True))
+    builder.text(TextBox(176, 540, 830, 26, _conclusion(texts, "该页已重排为红蓝标题、结构化要点和科研汇报结论栏。"), style.body_size))
     return builder.xml()
 
 
-def _base_builder(title_red: str, title_blue: str, slide_number: int | None) -> SlideBuilder:
-    builder = SlideBuilder()
+def _base_builder(title_red: str, title_blue: str, slide_number: int | None, style: ReferenceStyle) -> SlideBuilder:
+    builder = SlideBuilder(style)
     builder.shape(ShapeBox(0, 0, SLIDE_W, SLIDE_H, "FFFFFF", None))
-    builder.text(TextBox(38, 22, 210, 38, title_red, 28, "D60000", True, font="SimHei"))
-    builder.text(TextBox(252, 24, 910, 42, f"—{title_blue}", 24, "243A8F"))
-    builder.shape(ShapeBox(38, 74, 1188, 2, "243A8F", None))
-    builder.shape(ShapeBox(36, 686, 1188, 1, "8FA6C7", None))
-    builder.text(TextBox(38, 694, 520, 14, "Research-style redesigned by PPT Optimizer", 10, "6E747A"))
-    builder.text(TextBox(1192, 694, 34, 14, str(slide_number or 1).zfill(2), 10, "6E747A", align="right"))
+    builder.text(TextBox(38, 22, 210, 38, title_red, style.title_size, style.accent, True, font=style.title_font))
+    builder.text(TextBox(252, 24, 910, 34, f"—{title_blue}", 22, style.primary, font=style.title_font))
+    builder.shape(ShapeBox(38, 82, 1188, 2, style.primary, None))
+    builder.shape(ShapeBox(36, 686, 1188, 1, style.border, None))
+    builder.text(TextBox(38, 694, 520, 14, "Research-style redesigned by PPT Optimizer", 10, style.muted))
+    builder.text(TextBox(1192, 694, 34, 14, str(slide_number or 1).zfill(2), 10, style.muted, align="right"))
     return builder
 
 
@@ -252,8 +262,9 @@ def _table_cell(
     color: str,
     bold: bool,
     size: int,
+    style: ReferenceStyle,
 ) -> None:
-    builder.text(TextBox(x, y, w, h, text, size, color, bold, "center", fill, "B8C6DB"))
+    builder.text(TextBox(x, y, w, h, text, size, color, bold, "center", fill, style.border))
 
 
 def _title_parts(texts: list[str], fallback_red: str, fallback_blue: str) -> tuple[str, str]:
@@ -265,10 +276,10 @@ def _title_parts(texts: list[str], fallback_red: str, fallback_blue: str) -> tup
             left, right = title.split(marker, 1)
             left = _clean_title(left) or fallback_red
             right = _clean_title(right) or fallback_blue
-            return _short(left, 8), _short(right, 28)
+            return _short(left, 8), _short(right, 24)
     if len(title) <= 12:
         return _short(title, 8), fallback_blue
-    return fallback_red, _short(title, 30)
+    return fallback_red, _short(title, 24)
 
 
 def _best_title(texts: list[str]) -> str:
@@ -380,12 +391,13 @@ def _text_xml(shape_id: int, box: TextBox) -> str:
 def _paragraph_xml(text: str, box: TextBox) -> str:
     align = {"left": "l", "center": "ctr", "right": "r"}.get(box.align, "l")
     bold = ' b="1"' if box.bold else ""
+    font = box.font or DEFAULT_STYLE.body_font
     return f"""          <a:p>
             <a:pPr algn="{align}"/>
             <a:r>
               <a:rPr lang="zh-CN" sz="{box.size * 100}"{bold}>
                 <a:solidFill><a:srgbClr val="{box.color}"/></a:solidFill>
-                <a:latin typeface="{_xml(box.font)}"/><a:ea typeface="{_xml(box.font)}"/><a:cs typeface="{_xml(box.font)}"/>
+                <a:latin typeface="{_xml(font)}"/><a:ea typeface="{_xml(font)}"/><a:cs typeface="{_xml(font)}"/>
               </a:rPr>
               <a:t>{_xml(text)}</a:t>
             </a:r>
@@ -414,6 +426,13 @@ def _line_xml(color: str | None) -> str:
     if not color:
         return "<a:ln><a:noFill/></a:ln>"
     return f'<a:ln w="9525"><a:solidFill><a:srgbClr val="{color}"/></a:solidFill></a:ln>'
+
+
+def _light_accent(color: str) -> str:
+    r = int(color[0:2], 16)
+    g = int(color[2:4], 16)
+    b = int(color[4:6], 16)
+    return "".join(f"{round(channel + (255 - channel) * 0.92):02X}" for channel in (r, g, b))
 
 
 def _emu(value: int | float) -> int:
